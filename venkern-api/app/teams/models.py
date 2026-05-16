@@ -21,6 +21,7 @@ class Team(db.Model):
     )
 
     contacts = db.relationship("Contact", back_populates="team", lazy=True)
+    tasks = db.relationship("Task", back_populates="team", lazy=True)
 
     def to_dict(self):
         return {

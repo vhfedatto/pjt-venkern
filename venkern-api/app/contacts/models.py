@@ -15,6 +15,7 @@ class Contact(db.Model):
 
     team_id = db.Column(db.Integer, db.ForeignKey("teams.id"), nullable=True)
     team = db.relationship("Team", back_populates="contacts")
+    tasks = db.relationship("Task", back_populates="assignee", lazy=True)
 
     is_favorite = db.Column(db.Boolean, default=False, nullable=False)
 
