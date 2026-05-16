@@ -230,21 +230,203 @@ Durante o desenvolvimento local, o mais comum é usar:
 - host: `localhost`
 - porta: `5432`
 
+### Alternativa: rodar PostgreSQL com Docker
+
+Se você não quiser instalar o PostgreSQL diretamente no sistema, pode rodar o banco em um container Docker.  
+Essa opção costuma ser muito útil porque:
+
+- evita instalar o banco manualmente
+- deixa o ambiente mais isolado
+- facilita apagar e recriar o banco
+- ajuda toda a equipe a usar uma configuração parecida
+
+### O que você precisa ter instalado
+
+Antes de usar essa opção, instale:
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+
+Depois, abra o Docker Desktop e verifique se ele está em execução.
+
+### Comando para subir o PostgreSQL no Docker
+
+Você pode usar este comando:
+
+```powershell
+docker run --name venkern-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=venkern_db `
+  -p 5432:5432 `
+  -d postgres:16
+```
+
+### O que esse comando faz?
+
+- cria um container chamado `venkern-postgres`
+- define o usuário como `postgres`
+- define a senha como `postgres`
+- cria o banco `venkern_db`
+- libera a porta `5432`
+- roda o PostgreSQL em segundo plano
+
+### Como verificar se o container está rodando
+
+```powershell
+docker ps
+```
+
+Se tudo estiver certo, você verá o container `venkern-postgres` na lista.
+
+### Como parar o container
+
+```powershell
+docker stop venkern-postgres
+```
+
+### Como iniciar novamente depois
+
+```powershell
+docker start venkern-postgres
+```
+
+### Como remover o container
+
+Se você quiser apagar completamente esse banco de teste:
+
+```powershell
+docker rm -f venkern-postgres
+```
+
+### Como fica a `DATABASE_URL` usando Docker?
+
+Se você usar exatamente o comando acima, a sua configuração no `.env` pode continuar assim:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/venkern_db
+```
+
+Isso funciona porque a porta do container foi conectada com a porta `5432` da sua máquina.
+
+### Como visualizar o banco que está no Docker
+
+Mesmo usando Docker, você ainda pode abrir o banco em ferramentas visuais como:
+
+- pgAdmin
+- DBeaver
+- TablePlus
+- Azure Data Studio
+
+Na prática, a conexão será a mesma:
+
+- host: `localhost`
+- porta: `5432`
+- usuário: `postgres`
+- senha: `postgres`
+- banco: `venkern_db`
+
+### Observação importante
+
+Se a porta `5432` já estiver ocupada por outro PostgreSQL instalado localmente, o container pode falhar ao iniciar.  
+Nesse caso, você pode trocar a porta do lado esquerdo do mapeamento.
+
+Exemplo:
+
+```powershell
+docker run --name venkern-postgres `
+  -e POSTGRES_USER=postgres `
+  -e POSTGRES_PASSWORD=postgres `
+  -e POSTGRES_DB=venkern_db `
+  -p 5433:5432 `
+  -d postgres:16
+```
+
+E aí a `DATABASE_URL` ficaria:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/venkern_db
+```
+
 ---
 
 ## 7. Como criar o banco
 
-Você pode criar o banco pelo:
+Você pode criar e abrir o banco de duas formas bem amigáveis:
 
-- pgAdmin
-- terminal SQL
-- DBeaver
+- **DBeaver**
+- **Visual Studio Code com extensão MSSQL**
+
+Hoje, entre Azure Data Studio e VS Code, vale mais a pena ensinar **VS Code**.  
+Motivo: a Microsoft aposentou o Azure Data Studio em **28 de fevereiro de 2026** e recomenda usar o **Visual Studio Code com a extensão MSSQL** para trabalho contínuo.
+
+### Opção 1. Criar o banco pelo DBeaver
+
+O DBeaver é uma das opções mais fáceis para iniciantes porque ele mostra tudo visualmente.
+
+#### Passo a passo
+
+1. abra o DBeaver
+2. clique em **New Database Connection**
+3. escolha **PostgreSQL**
+4. preencha os dados da conexão:
+
+- Host: `localhost`
+- Port: `5432`
+- Database: `postgres`
+- Username: `postgres`
+- Password: `postgres`
+
+5. clique em **Test Connection**
+6. se der certo, clique em **Finish**
+7. abra o editor SQL dentro do DBeaver
+8. rode este comando:
 
 Exemplo em SQL:
 
 ```sql
 CREATE DATABASE venkern_db;
 ```
+
+Depois disso, o banco `venkern_db` estará criado.
+
+### Opção 2. Criar o banco pelo VS Code com MSSQL
+
+Se você já usa VS Code no dia a dia, essa opção é muito boa porque mantém tudo no mesmo lugar.
+
+#### O que instalar
+
+No VS Code, instale:
+
+- extensão **PostgreSQL** para navegação visual do banco
+- ou a extensão **MSSQL**, se você também quiser seguir a recomendação da Microsoft para o ecossistema SQL
+
+Como este projeto usa **PostgreSQL**, para navegar nas tabelas do banco do Venkern a experiência mais direta costuma ser com uma extensão de PostgreSQL no VS Code.
+
+#### Passo a passo
+
+1. abra o VS Code
+2. vá até a aba de extensões
+3. instale uma extensão de PostgreSQL
+4. abra a extensão e crie uma nova conexão
+5. preencha:
+
+- Host: `localhost`
+- Port: `5432`
+- User: `postgres`
+- Password: `postgres`
+- Database: `postgres`
+
+6. conecte ao servidor
+7. abra um editor SQL pela própria extensão
+8. execute:
+
+```sql
+CREATE DATABASE venkern_db;
+```
+
+Se você tiver subido o PostgreSQL via Docker, os dados da conexão continuam os mesmos, a menos que você tenha trocado a porta.
+
+### Depois de criar o banco
 
 Depois disso, configure a `DATABASE_URL` no `.env`.
 
@@ -537,10 +719,39 @@ Exemplo de resposta:
 
 Você pode usar ferramentas visuais para abrir o PostgreSQL:
 
-- **pgAdmin**
 - **DBeaver**
+- **Visual Studio Code**
+- **pgAdmin**
 - **TablePlus**
-- **Azure Data Studio**
+
+### Qual delas vale mais a pena ensinar?
+
+Para este projeto, a recomendação mais prática é:
+
+- **DBeaver** para quem quer uma interface visual pronta e simples
+- **VS Code** para quem quer centralizar código e banco no mesmo lugar
+
+O **Azure Data Studio** não é mais a melhor opção para ensinar, porque foi aposentado pela Microsoft em **28 de fevereiro de 2026** e a recomendação oficial é migrar para **VS Code**.
+
+### Como abrir pelo DBeaver
+
+1. abra o DBeaver
+2. conecte no PostgreSQL
+3. expanda:
+   - servidor
+   - databases
+   - `venkern_db`
+   - schemas
+   - public
+   - tables
+
+### Como abrir pelo VS Code
+
+1. abra o VS Code
+2. use a extensão de PostgreSQL
+3. crie a conexão com o banco
+4. expanda o banco `venkern_db`
+5. abra as tabelas pela árvore lateral da extensão
 
 ### Tabelas principais para observar
 
