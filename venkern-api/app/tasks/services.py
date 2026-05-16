@@ -2,6 +2,12 @@ from datetime import datetime
 
 from app.contacts.models import Contact
 from app.teams.models import Team
+from app.utils.validators import (
+    parse_int,
+    validate_priority as validate_priority_value,
+    validate_required_fields,
+    validate_status as validate_status_value,
+)
 
 from .models import ALLOWED_TASK_PRIORITIES, ALLOWED_TASK_STATUSES, Task
 
@@ -17,18 +23,16 @@ def parse_due_date(value):
 
 
 def validate_status(value):
-    if value not in ALLOWED_TASK_STATUSES:
-        raise ValueError(
-            f"status must be one of: {', '.join(sorted(ALLOWED_TASK_STATUSES))}"
-        )
+    error = validate_status_value(value, ALLOWED_TASK_STATUSES)
+    if error:
+        raise ValueError(error)
     return value
 
 
 def validate_priority(value):
-    if value not in ALLOWED_TASK_PRIORITIES:
-        raise ValueError(
-            f"priority must be one of: {', '.join(sorted(ALLOWED_TASK_PRIORITIES))}"
-        )
+    error = validate_priority_value(value, ALLOWED_TASK_PRIORITIES)
+    if error:
+        raise ValueError(error)
     return value
 
 
@@ -36,7 +40,7 @@ def get_assignee(assignee_id):
     if assignee_id in (None, ""):
         return None
 
-    assignee = Contact.query.get(assignee_id)
+    assignee = Contact.query.get(parse_int(assignee_id, "assignee_id"))
     if assignee is None:
         raise ValueError("assignee_id does not reference an existing contact")
     return assignee
@@ -46,7 +50,7 @@ def get_team(team_id):
     if team_id in (None, ""):
         return None
 
-    team = Team.query.get(team_id)
+    team = Team.query.get(parse_int(team_id, "team_id"))
     if team is None:
         raise ValueError("team_id does not reference an existing team")
     return team
@@ -59,21 +63,24 @@ def validate_task_payload(data, partial=False):
     priority_provided = "priority" in data
 
     if not partial or title_provided:
-        title = (data.get("title") or "").strip()
-        if not title:
-            raise ValueError("title is required")
+        error = validate_required_fields(data, ["title"])
+        if error:
+            raise ValueError(error)
+        title = data.get("title").strip()
         payload["title"] = title
 
     if not partial or status_provided:
+        error = validate_required_fields(data, ["status"])
+        if error:
+            raise ValueError(error)
         status = data.get("status")
-        if not status:
-            raise ValueError("status is required")
         payload["status"] = validate_status(status)
 
     if not partial or priority_provided:
+        error = validate_required_fields(data, ["priority"])
+        if error:
+            raise ValueError(error)
         priority = data.get("priority")
-        if not priority:
-            raise ValueError("priority is required")
         payload["priority"] = validate_priority(priority)
 
     if "description" in data or not partial:
@@ -107,10 +114,10 @@ def apply_task_filters(query, args, include_status=True):
         query = query.filter(Task.priority == priority)
 
     if team_id:
-        query = query.filter(Task.team_id == int(team_id))
+        query = query.filter(Task.team_id == parse_int(team_id, "team_id"))
 
     if assignee_id:
-        query = query.filter(Task.assignee_id == int(assignee_id))
+        query = query.filter(Task.assignee_id == parse_int(assignee_id, "assignee_id"))
 
     if search:
         term = f"%{search}%"

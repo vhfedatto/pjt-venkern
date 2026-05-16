@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify, request
 
 from app.extensions import db
+from app.utils.responses import error_response
+from app.utils.validators import validate_required_fields
 from .models import Team
 
 teams_bp = Blueprint("teams", __name__)
@@ -9,7 +11,7 @@ teams_bp = Blueprint("teams", __name__)
 def _get_team_or_404(team_id):
     team = Team.query.get(team_id)
     if team is None:
-        return None, (jsonify({"error": "team not found"}), 404)
+        return None, error_response("Team not found", 404)
     return team, None
 
 
@@ -22,10 +24,11 @@ def list_teams():
 @teams_bp.post("")
 def create_team():
     data = request.get_json(silent=True) or {}
-    name = (data.get("name") or "").strip()
+    required_error = validate_required_fields(data, ["name"])
+    if required_error:
+        return error_response(required_error, 400)
 
-    if not name:
-        return jsonify({"error": "name is required"}), 400
+    name = data.get("name").strip()
 
     team = Team(
         name=name,
@@ -57,10 +60,10 @@ def update_team(team_id):
     data = request.get_json(silent=True) or {}
 
     if "name" in data:
-        name = (data.get("name") or "").strip()
-        if not name:
-            return jsonify({"error": "name is required"}), 400
-        team.name = name
+        required_error = validate_required_fields(data, ["name"])
+        if required_error:
+            return error_response(required_error, 400)
+        team.name = data.get("name").strip()
 
     if "description" in data:
         team.description = data.get("description")
@@ -80,7 +83,7 @@ def delete_team(team_id):
         return error_response
 
     if team.contacts:
-        return jsonify({"error": "cannot delete team with linked contacts"}), 400
+        return error_response("Team has linked contacts and cannot be deleted", 400)
 
     db.session.delete(team)
     db.session.commit()

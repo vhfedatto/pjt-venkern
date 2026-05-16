@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from app.extensions import db
+from app.utils.responses import error_response
 
 from .models import TASK_STATUSES, Task
 from .services import apply_task_filters, validate_status, validate_task_payload
@@ -11,13 +12,16 @@ tasks_bp = Blueprint("tasks", __name__)
 def _get_task_or_404(task_id):
     task = Task.query.get(task_id)
     if task is None:
-        return None, (jsonify({"error": "task not found"}), 404)
+        return None, error_response("Task not found", 404)
     return task, None
 
 
 @tasks_bp.get("")
 def list_tasks():
-    query = apply_task_filters(Task.query, request.args)
+    try:
+        query = apply_task_filters(Task.query, request.args)
+    except ValueError as exc:
+        return error_response(str(exc), 400)
 
     tasks = query.order_by(Task.created_at.desc()).all()
 
@@ -26,7 +30,11 @@ def list_tasks():
 
 @tasks_bp.get("/kanban")
 def get_kanban():
-    query = apply_task_filters(Task.query, request.args, include_status=False)
+    try:
+        query = apply_task_filters(Task.query, request.args, include_status=False)
+    except ValueError as exc:
+        return error_response(str(exc), 400)
+
     tasks = query.order_by(Task.created_at.desc()).all()
 
     kanban = {status: [] for status in TASK_STATUSES}
@@ -45,7 +53,7 @@ def create_task():
     try:
         payload = validate_task_payload(data, partial=False)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return error_response(str(exc), 400)
 
     task = Task(**payload)
     db.session.add(task)
@@ -74,7 +82,7 @@ def update_task(task_id):
     try:
         payload = validate_task_payload(data, partial=False)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return error_response(str(exc), 400)
 
     for field, value in payload.items():
         setattr(task, field, value)
@@ -106,12 +114,12 @@ def update_task_status(task_id):
     status = data.get("status")
 
     if not status:
-        return jsonify({"error": "status is required"}), 400
+        return error_response("status is required", 400)
 
     try:
         task.status = validate_status(status)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return error_response(str(exc), 400)
 
     db.session.commit()
 
