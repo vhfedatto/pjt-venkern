@@ -11,6 +11,9 @@ def create_app():
     cors.init_app(app)
 
     from .contacts.routes import contacts_bp
+    from .teams.routes import teams_bp
+
     app.register_blueprint(contacts_bp, url_prefix="/api/contacts")
+    app.register_blueprint(teams_bp, url_prefix="/api/teams")
 
     return app

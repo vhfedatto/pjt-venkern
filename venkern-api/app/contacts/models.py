@@ -13,7 +13,8 @@ class Contact(db.Model):
     function_type = db.Column(db.String(50), nullable=True)
     notes = db.Column(db.Text, nullable=True)
 
-    team_id = db.Column(db.Integer, nullable=True)
+    team_id = db.Column(db.Integer, db.ForeignKey("teams.id"), nullable=True)
+    team = db.relationship("Team", back_populates="contacts")
 
     is_favorite = db.Column(db.Boolean, default=False, nullable=False)
 
@@ -28,21 +29,25 @@ class Contact(db.Model):
         onupdate=lambda: datetime.now(timezone.utc)
     )
 
-    def to_dict(self):
-        initials = "".join(
-            [part[0] for part in self.full_name.split()[:2]]
-        ).upper()
+    def get_initials(self):
+        return "".join([part[0] for part in self.full_name.split()[:2]]).upper()
 
+    def to_dict(self):
         return {
             "id": self.id,
             "full_name": self.full_name,
-            "initials": initials,
+            "initials": self.get_initials(),
             "phone": self.phone,
             "email": self.email,
             "role": self.role,
             "function_type": self.function_type,
             "notes": self.notes,
             "team_id": self.team_id,
+            "team": {
+                "id": self.team.id,
+                "name": self.team.name,
+                "color": self.team.color,
+            } if self.team else None,
             "is_favorite": self.is_favorite,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
