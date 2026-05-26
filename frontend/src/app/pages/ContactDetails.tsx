@@ -38,7 +38,7 @@ export default function ContactDetails() {
   const { currentUser } = useApp();
   const { teams } = useTeams();
   const { tasks } = useTasks();
-  const { contact, interactions, documents, loading, error, addInteraction, uploadDocument, removeDocument } = useContactDetails(id!);
+  const { contact, contacts, interactions, documents, loading, error, addInteraction, uploadDocument, removeDocument } = useContactDetails(id!);
 
   const [interactionType, setInteractionType] = useState<InteractionType>('note');
   const [description, setDescription] = useState('');
@@ -48,6 +48,7 @@ export default function ContactDetails() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const team = teams.find(t => t.id === contact?.teamId);
+  const responsible = contacts.find(c => c.id === contact?.responsibleId);
   const contactTasks = tasks.filter(t => t.assigneeId === id);
 
   if (loading) {
@@ -79,7 +80,7 @@ export default function ContactDetails() {
     }
     setSubmitting(true);
     try {
-      await addInteraction(interactionType, description, currentUser.id);
+      await addInteraction(interactionType, description, currentUser.contactId);
       setDescription('');
       toast.success('Histórico atualizado.');
     } catch (e: any) {
@@ -253,7 +254,7 @@ export default function ContactDetails() {
               <CalendarClock className="w-5 h-5 text-indigo-500 mb-2" />
               <p className="font-semibold text-gray-900 dark:text-white">{contact.nextAction ?? 'Definir próxima ação'}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Prazo: {contact.nextActionDate ?? 'Sem prazo'}</p>
-              <p className="text-xs text-gray-400 mt-2">Responsável: {contact.responsibleId ? `ID ${contact.responsibleId}` : 'Não definido'}</p>
+              <p className="text-xs text-gray-400 mt-2">Responsável: {responsible?.name ?? 'Não definido'}</p>
             </div>
           </section>
 

@@ -168,6 +168,38 @@ export const interactionsApi = {
 export const documentsApi = {
   list: (contactId?: string) =>
     api.get<any[]>(contactId ? `/contact-documents?contact_id=${contactId}` : '/contact-documents'),
+  upload: async (contactId: string, file: File, uploadedBy?: string) => {
+    const body = new FormData();
+    body.append('contact_id', contactId);
+    body.append('name', file.name);
+    body.append('file', file);
+    if (uploadedBy) body.append('uploaded_by', uploadedBy);
+    return api.postFile<any>('/contact-documents', body);
+  },
+  download: async (documentId: string, filename?: string) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(`${API_BASE_URL}/contact-documents/${documentId}/download`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (response.status === 401) {
+      localStorage.removeItem(TOKEN_KEY);
+      window.location.href = '/login';
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as any;
+      throw new Error(body.message ?? body.error ?? `Erro HTTP ${response.status}`);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'documento';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
   create: (body: unknown) => api.post<any>('/contact-documents', body),
   remove: (id: string) => api.delete<any>(`/contact-documents/${id}`),
 };

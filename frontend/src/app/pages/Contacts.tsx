@@ -181,13 +181,13 @@ export default function Contacts() {
                 return (
                   <motion.div key={c.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3.5 border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-slate-50 dark:hover:bg-gray-800/40 transition-colors items-center group">
-                    <div className="flex items-center gap-3">
+                    <button onClick={() => navigate(`/contatos/${c.id}`)} className="flex items-center gap-3 min-w-0 text-left">
                       <Avatar name={c.name} size="sm" status={c.status} />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{c.name}</p>
                         <p className="text-xs text-gray-400 truncate">{c.email}</p>
                       </div>
-                    </div>
+                    </button>
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${team?.bgColor ?? 'bg-gray-100'} ${team?.textColor ?? 'text-gray-600'} w-fit`}>{team?.name.split(' ')[0]}</span>
                     <StatusBadge status={c.status} />
                     <span className="text-sm text-gray-500 dark:text-gray-400 truncate">{c.position}</span>
@@ -217,7 +217,9 @@ export default function Contacts() {
                       <div className="flex items-start justify-between mb-4">
                         <Avatar name={c.name} size="lg" status={c.status} />
                       </div>
-                      <h3 className="font-bold text-gray-900 dark:text-white text-sm mb-0.5 truncate">{c.name}</h3>
+                      <button onClick={() => navigate(`/contatos/${c.id}`)} className="text-left">
+                        <h3 className="font-bold text-gray-900 dark:text-white text-sm mb-0.5 truncate">{c.name}</h3>
+                      </button>
                       <p className="text-xs text-gray-400 truncate mb-3">{c.position}</p>
                       <div className="flex gap-2 mb-4 flex-wrap">
                         <StatusBadge status={c.status} />
@@ -309,6 +311,7 @@ export default function Contacts() {
             <div>
               <label className={labelCls}>Equipe</label>
               <select value={form.teamId} onChange={e => setForm(p => ({ ...p, teamId: e.target.value }))} className={inputCls}>
+                <option value="">Sem equipe</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             </div>

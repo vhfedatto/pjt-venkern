@@ -1,7 +1,23 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AppUser } from '../types';
-import { currentUser as defaultUser } from '../data/mockData';
+import { contactsApi } from '../services/api';
+import { mapApiContactToUi } from '../services/mappers';
 import { useAuth } from './AuthContext';
+import { useProject } from './ProjectContext';
+
+const THEME_KEY = 'venkern_dark_mode';
+
+const emptyUser: AppUser = {
+  id: '',
+  contactId: undefined,
+  name: '',
+  email: '',
+  username: undefined,
+  role: 'professional',
+  teamId: '',
+  position: '',
+  status: 'offline',
+};
 
 interface AppContextType {
   currentUser: AppUser;
@@ -15,33 +31,101 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const { currentProject } = useProject();
   const { user: authUser } = useAuth();
-  const [currentUser, setCurrentUser] = useState<AppUser>(() =>
+  const baseUser = useMemo<AppUser>(() => (
     authUser
-      ? { id: String(authUser.id), name: authUser.name, email: authUser.email, username: authUser.username,
-          role: authUser.role as 'admin' | 'professional', teamId: '', position: '', status: 'online' }
-      : defaultUser
-  );
-  const [darkMode, setDarkModeState] = useState(false);
+      ? {
+          id: String(authUser.id),
+          contactId: undefined,
+          name: authUser.name,
+          email: authUser.email,
+          username: authUser.username,
+          role: authUser.role as 'admin' | 'professional',
+          teamId: '',
+          position: '',
+          status: 'online',
+        }
+      : emptyUser
+  ), [authUser]);
+  const [currentUser, setCurrentUser] = useState<AppUser>(baseUser);
+  const [darkMode, setDarkModeState] = useState(() => localStorage.getItem(THEME_KEY) === 'true');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    if (authUser) {
-      setCurrentUser(prev => ({
+    setCurrentUser(prev => {
+      if (!authUser) {
+        return emptyUser;
+      }
+      return {
         ...prev,
-        id: String(authUser.id),
-        name: authUser.name,
-        email: authUser.email,
-        username: authUser.username,
-        role: authUser.role as 'admin' | 'professional',
-      }));
+        ...baseUser,
+        contactId: prev.contactId,
+        teamId: prev.teamId,
+        position: prev.position,
+        status: 'online',
+      };
+    });
+  }, [authUser, baseUser]);
+
+  useEffect(() => {
+    if (darkMode) document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [darkMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateContactProfile() {
+      if (!authUser || !currentProject) {
+        setCurrentUser(prev => ({
+          ...prev,
+          contactId: undefined,
+          teamId: '',
+          position: '',
+          status: authUser ? 'online' : 'offline',
+        }));
+        return;
+      }
+
+      try {
+        const response = await contactsApi.list({
+          project_id: currentProject.id,
+          per_page: 200,
+          search: authUser.email,
+        });
+        const matches = (response.data ?? []).map(mapApiContactToUi).filter((contact: any) => contact.email === authUser.email);
+        if (cancelled) return;
+
+        const linkedContact = matches[0];
+        setCurrentUser(prev => ({
+          ...prev,
+          contactId: linkedContact?.id,
+          teamId: linkedContact?.teamId ?? '',
+          position: linkedContact?.position ?? '',
+          status: 'online',
+        }));
+      } catch {
+        if (cancelled) return;
+        setCurrentUser(prev => ({
+          ...prev,
+          contactId: undefined,
+          teamId: '',
+          position: '',
+          status: 'online',
+        }));
+      }
     }
-  }, [authUser]);
+
+    hydrateContactProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser, currentProject]);
 
   const setDarkMode = (v: boolean) => {
     setDarkModeState(v);
-    if (v) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
+    localStorage.setItem(THEME_KEY, String(v));
   };
 
   return (

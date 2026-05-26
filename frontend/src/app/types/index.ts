@@ -151,6 +151,7 @@ export interface ModerationAlert {
 
 export interface AppUser {
   id: string;
+  contactId?: string;
   name: string;
   email: string;
   username?: string;

@@ -174,6 +174,27 @@ def on_typing(data):
     )
 
 
+@socketio.on("typing_group")
+def on_group_typing(data):
+    user = _current_user()
+    if user is None:
+        return
+
+    data = data or {}
+    group_id = data.get("groupId")
+    is_typing = bool(data.get("isTyping", False))
+
+    if not group_id:
+        return
+
+    socketio.emit(
+        "group:typing",
+        {"groupId": group_id, "userId": user.id, "name": user.name, "isTyping": is_typing},
+        to=f"group:{group_id}",
+        skip_sid=flask_request.sid,
+    )
+
+
 @socketio.on("mark_read")
 def on_mark_read(data):
     user = _current_user()
