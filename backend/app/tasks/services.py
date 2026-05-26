@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from app.contacts.models import Contact
+from app.extensions import db
 from app.teams.models import Team
 from app.utils.validators import (
     parse_int,
@@ -44,7 +45,7 @@ def get_assignee(assignee_id):
     if assignee_id in (None, ""):
         return None
 
-    assignee = Contact.query.get(parse_int(assignee_id, "assignee_id"))
+    assignee = db.session.get(Contact, parse_int(assignee_id, "assignee_id"))
     if assignee is None:
         raise ValueError("assignee_id does not reference an existing contact")
     return assignee
@@ -54,7 +55,7 @@ def get_team(team_id):
     if team_id in (None, ""):
         return None
 
-    team = Team.query.get(parse_int(team_id, "team_id"))
+    team = db.session.get(Team, parse_int(team_id, "team_id"))
     if team is None:
         raise ValueError("team_id does not reference an existing team")
     return team

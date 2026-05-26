@@ -22,7 +22,7 @@ def _current_user() -> User | None:
     uid = getattr(flask_request, "_ws_user_id", None)
     if uid is None:
         return None
-    return User.query.get(uid)
+    return db.session.get(User, uid)
 
 
 def _find_contact_for_user(user: User, contact_ids: list[int]) -> Contact | None:
@@ -79,7 +79,7 @@ def on_join_conversation(data):
         emit("error", {"message": "conversationId obrigatório"})
         return
 
-    conv = ChatConversation.query.get(int(conv_id))
+    conv = db.session.get(ChatConversation, int(conv_id))
     if conv is None:
         emit("error", {"message": "Conversa não encontrada"})
         return
@@ -118,7 +118,7 @@ def on_send_private_message(data):
         emit("error", {"message": f"Mensagem muito longa (máx {MAX_MESSAGE_LENGTH} chars)"})
         return
 
-    conv = ChatConversation.query.get(int(conv_id))
+    conv = db.session.get(ChatConversation, int(conv_id))
     if conv is None:
         emit("error", {"message": "Conversa não encontrada"})
         return
@@ -149,7 +149,17 @@ def on_send_private_message(data):
         "blocked": msg.blocked,
         "createdAt": msg.timestamp.isoformat(),
     }
+    # Deliver to everyone in the conversation room (both users if both have it open)
     socketio.emit("private_message:new", payload, to=f"conversation:{conv_id}")
+
+    # Also deliver directly to the recipient's personal room so they receive
+    # the message even when offline or when they haven't opened this conversation
+    other_contact_id = conv.participant_b if contact.id == conv.participant_a else conv.participant_a
+    other_contact = db.session.get(Contact, other_contact_id)
+    if other_contact:
+        recipient_user = User.query.filter_by(email=other_contact.email).first()
+        if recipient_user:
+            socketio.emit("private_message:new", payload, to=f"user:{recipient_user.id}")
 
 
 @socketio.on("typing")
@@ -226,13 +236,13 @@ def on_join_group(data):
         emit("error", {"message": "groupId obrigatório"})
         return
 
-    group = Group.query.get(int(group_id))
+    group = db.session.get(Group, int(group_id))
     if group is None:
         emit("error", {"message": "Grupo não encontrado"})
         return
 
     # Admins can join any group; others need membership
-    is_admin = User.query.get(user.id) and User.query.get(user.id).role == "admin"
+    is_admin = user.role == "admin"
     contact = _user_contact_in_group(user, group)
     if not is_admin and contact is None:
         emit("error", {"message": "Você não é membro deste grupo"})
@@ -267,7 +277,7 @@ def on_send_group_message(data):
         emit("error", {"message": f"Mensagem muito longa (máx {MAX_MESSAGE_LENGTH} chars)"})
         return
 
-    group = Group.query.get(int(group_id))
+    group = db.session.get(Group, int(group_id))
     if group is None:
         emit("error", {"message": "Grupo não encontrado"})
         return

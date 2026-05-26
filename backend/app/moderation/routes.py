@@ -14,7 +14,7 @@ ALLOWED_CONTEXTS = set(MODERATION_CONTEXTS)
 
 
 def _get_or_404(alert_id):
-    alert = ModerationAlert.query.get(alert_id)
+    alert = db.session.get(ModerationAlert, alert_id)
     if alert is None:
         return None, error_response("Alert not found", 404)
     return alert, None

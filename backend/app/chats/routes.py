@@ -19,7 +19,7 @@ def _has_platform_account(contact: Contact) -> bool:
 
 
 def _get_or_404(chat_id):
-    chat = ChatConversation.query.get(chat_id)
+    chat = db.session.get(ChatConversation, chat_id)
     if chat is None:
         return None, error_response("Conversation not found", 404)
     return chat, None
@@ -68,8 +68,8 @@ def create_conversation():
     if pa == pb:
         return error_response("Participants must be different contacts", 400)
 
-    contact_a = Contact.query.get(pa)
-    contact_b = Contact.query.get(pb)
+    contact_a = db.session.get(Contact, pa)
+    contact_b = db.session.get(Contact, pb)
     if contact_a is None or contact_b is None:
         return error_response("One or both participants not found", 404)
 
@@ -129,7 +129,7 @@ def send_message(chat_id):
     if required_error:
         return error_response(required_error, 400)
 
-    sender_contact = Contact.query.get(int(data["sender_id"]))
+    sender_contact = db.session.get(Contact, int(data["sender_id"]))
     if sender_contact is None:
         return error_response("Sender contact not found", 404)
 

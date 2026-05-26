@@ -4,6 +4,7 @@ from flask_jwt_extended.exceptions import JWTExtendedException
 from jwt.exceptions import PyJWTError
 
 from app.auth.models import User
+from app.extensions import db
 
 
 def get_user_from_socket_token(token: str | None) -> User | None:
@@ -15,6 +16,6 @@ def get_user_from_socket_token(token: str | None) -> User | None:
         user_id = decoded.get("sub")
         if user_id is None:
             return None
-        return User.query.get(int(user_id))
+        return db.session.get(User, int(user_id))
     except (JWTExtendedException, PyJWTError, ValueError, TypeError):
         return None

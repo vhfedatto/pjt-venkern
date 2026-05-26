@@ -24,7 +24,7 @@ def _require_admin():
 
 
 def _get_team_or_404(team_id):
-    team = Team.query.get(team_id)
+    team = db.session.get(Team, team_id)
     if team is None:
         return None, error_response("Team not found", 404)
     return team, None

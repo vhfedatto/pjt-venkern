@@ -13,7 +13,7 @@ tasks_bp = Blueprint("tasks", __name__)
 
 
 def _get_task_or_404(task_id):
-    task = Task.query.get(task_id)
+    task = db.session.get(Task, task_id)
     if task is None:
         return None, error_response("Task not found", 404)
     return task, None

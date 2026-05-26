@@ -74,7 +74,8 @@ def create_contact():
         except ValueError as exc:
             return error_response(str(exc), 400)
 
-        if Team.query.get(team_id) is None:
+        team = db.session.get(Team, team_id)
+        if team is None:
             return error_response("team_id does not reference an existing team", 400)
 
     origin = data.get("origin")
@@ -108,7 +109,7 @@ def create_contact():
         next_action=data.get("next_action"),
         next_action_date=next_action_date,
         responsible_id=responsible_id,
-        project_id=Team.query.get(team_id).project_id if team_id else data.get("project_id"),
+        project_id=team.project_id if team_id else data.get("project_id"),
     )
 
     try:
@@ -125,13 +126,13 @@ def create_contact():
 
 @contacts_bp.get("/<int:contact_id>")
 def get_contact(contact_id):
-    contact = Contact.query.get_or_404(contact_id)
+    contact = db.get_or_404(Contact, contact_id)
     return jsonify(contact.to_dict()), 200
 
 
 @contacts_bp.put("/<int:contact_id>")
 def update_contact(contact_id):
-    contact = Contact.query.get_or_404(contact_id)
+    contact = db.get_or_404(Contact, contact_id)
     data = request.get_json(silent=True) or {}
     previous_team_id = contact.team_id
 
@@ -199,11 +200,12 @@ def update_contact(contact_id):
             except ValueError as exc:
                 return error_response(str(exc), 400)
 
-            if Team.query.get(team_id) is None:
+            team = db.session.get(Team, team_id)
+            if team is None:
                 return error_response("team_id does not reference an existing team", 400)
 
             contact.team_id = team_id
-            contact.project_id = Team.query.get(team_id).project_id
+            contact.project_id = team.project_id
 
     sync_contact_team_group(contact, previous_team_id)
 
@@ -218,7 +220,7 @@ def update_contact(contact_id):
 
 @contacts_bp.delete("/<int:contact_id>")
 def delete_contact(contact_id):
-    contact = Contact.query.get_or_404(contact_id)
+    contact = db.get_or_404(Contact, contact_id)
 
     from app.groups.models import group_members, GroupMessage
     from app.tasks.models import Task
@@ -267,7 +269,7 @@ def delete_contact(contact_id):
 
 @contacts_bp.patch("/<int:contact_id>/favorite")
 def toggle_favorite(contact_id):
-    contact = Contact.query.get_or_404(contact_id)
+    contact = db.get_or_404(Contact, contact_id)
     data = request.get_json(silent=True) or {}
 
     if "is_favorite" in data:

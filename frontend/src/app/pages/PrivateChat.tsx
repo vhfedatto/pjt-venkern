@@ -11,7 +11,7 @@ import { StatusBadge } from '../components/ui/Badge';
 export default function PrivateChat() {
   const { currentUser } = useApp();
   const { socket } = useSocket();
-  const { conversations, contacts, messages, messagesLoading, loading, error, loadMessages, sendMessage, createConversation } = useChats(socket);
+  const { conversations, contacts, messages, messagesLoading, loading, error, loadMessages, sendMessage, createConversation, unreadCounts } = useChats(socket);
   const [selectedChatId, setSelectedChatId] = useState<string>('');
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
@@ -153,6 +153,11 @@ export default function PrivateChat() {
                   <p className={`text-sm font-semibold truncate ${isSelected ? 'text-indigo-700 dark:text-indigo-400' : 'text-gray-900 dark:text-white'}`}>{other.name}</p>
                   <p className="text-xs text-gray-400 truncate">{other.position}</p>
                 </div>
+                {(unreadCounts[chat.id] ?? 0) > 0 && (
+                  <span className="flex-shrink-0 min-w-[18px] h-[18px] text-[10px] font-bold bg-indigo-500 text-white rounded-full flex items-center justify-center px-1">
+                    {unreadCounts[chat.id]}
+                  </span>
+                )}
               </button>
             );
           })}

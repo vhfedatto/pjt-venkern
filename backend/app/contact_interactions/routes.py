@@ -14,7 +14,7 @@ ALLOWED_TYPES = set(INTERACTION_TYPES)
 
 
 def _get_contact_or_error(contact_id):
-    contact = Contact.query.get(contact_id)
+    contact = db.session.get(Contact, contact_id)
     if contact is None:
         return None, error_response("contact_id does not reference an existing contact", 404)
     access_err = check_project_access(contact.project_id)
@@ -24,7 +24,7 @@ def _get_contact_or_error(contact_id):
 
 
 def _get_interaction_or_error(interaction_id):
-    interaction = ContactInteraction.query.get(interaction_id)
+    interaction = db.session.get(ContactInteraction, interaction_id)
     if interaction is None:
         return None, error_response("Interaction not found", 404)
     _, err = _get_contact_or_error(interaction.contact_id)

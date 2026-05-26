@@ -13,6 +13,7 @@ export function useChats(socket?: Socket | null) {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const activeConvIdRef = useRef<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -55,13 +56,25 @@ export function useChats(socket?: Socket | null) {
         timestamp: payload.createdAt,
         blocked: payload.blocked ?? false,
       };
-      setMessages(prev => {
-        if (prev.some(m => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
+      const convId = String(payload.conversationId);
+
+      // Only append to messages list if this is the currently open conversation
+      if (convId === activeConvIdRef.current) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      } else {
+        // Increment unread badge for other conversations
+        setUnreadCounts(prev => ({
+          ...prev,
+          [convId]: (prev[convId] ?? 0) + 1,
+        }));
+      }
+
       setConversations(prev =>
         prev.map(c =>
-          c.id === String(payload.conversationId)
+          c.id === convId
             ? { ...c, lastActivity: payload.createdAt }
             : c,
         ),
@@ -81,6 +94,8 @@ export function useChats(socket?: Socket | null) {
       socket.emit('join_conversation', { conversationId: Number(chatId) });
     }
     activeConvIdRef.current = chatId;
+    // Clear unread badge for this conversation
+    setUnreadCounts(prev => ({ ...prev, [chatId]: 0 }));
 
     setMessagesLoading(true);
     setMessages([]);
@@ -139,6 +154,7 @@ export function useChats(socket?: Socket | null) {
     messagesLoading,
     loading,
     error,
+    unreadCounts,
     refetch: fetchData,
     loadMessages,
     sendMessage,

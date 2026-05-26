@@ -14,7 +14,7 @@ groups_bp = Blueprint("groups", __name__)
 
 
 def _get_or_404(group_id):
-    group = Group.query.get(group_id)
+    group = db.session.get(Group, group_id)
     if group is None:
         return None, error_response("Group not found", 404)
     return group, None
@@ -57,7 +57,7 @@ def create_group():
 
     member_ids = data.get("member_ids", [])
     for mid in member_ids:
-        contact = Contact.query.get(mid)
+        contact = db.session.get(Contact, mid)
         if contact:
             group.members.append(contact)
 
@@ -98,7 +98,7 @@ def update_group(group_id):
     if "member_ids" in data:
         group.members = []
         for mid in data["member_ids"]:
-            contact = Contact.query.get(mid)
+            contact = db.session.get(Contact, mid)
             if contact:
                 group.members.append(contact)
 
@@ -134,7 +134,7 @@ def list_messages(group_id):
 
 @groups_bp.post("/<int:group_id>/messages")
 def send_message(group_id):
-    group, err = _get_or_404(group_id)
+    _, err = _get_or_404(group_id)
     if err:
         return err
 
@@ -145,7 +145,7 @@ def send_message(group_id):
 
     from app.contacts.models import Contact
     from app.projects.permissions import get_current_user, is_super_admin
-    sender = Contact.query.get(int(data["sender_id"]))
+    sender = db.session.get(Contact, int(data["sender_id"]))
     if sender is None:
         return error_response("Sender contact not found", 404)
     current_user = get_current_user()

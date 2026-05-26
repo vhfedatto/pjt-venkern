@@ -15,7 +15,7 @@ ALLOWED_STATUSES = set(EVENT_STATUSES)
 
 
 def _get_or_404(event_id):
-    event = AppEvent.query.get(event_id)
+    event = db.session.get(AppEvent, event_id)
     if event is None:
         return None, error_response("Event not found", 404)
     return event, None

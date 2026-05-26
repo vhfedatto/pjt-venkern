@@ -17,7 +17,7 @@ ALLOWED_FILE_TYPES = set(FILE_TYPES)
 
 
 def _get_contact_or_error(contact_id):
-    contact = Contact.query.get(contact_id)
+    contact = db.session.get(Contact, contact_id)
     if contact is None:
         return None, error_response("Contato não encontrado", 404)
     access_err = check_project_access(contact.project_id)
@@ -27,10 +27,10 @@ def _get_contact_or_error(contact_id):
 
 
 def _get_document_or_error(document_id):
-    doc = ContactDocument.query.get(document_id)
+    doc = db.session.get(ContactDocument, document_id)
     if doc is None:
         return None, error_response("Document not found", 404)
-    contact, err = _get_contact_or_error(doc.contact_id)
+    _, err = _get_contact_or_error(doc.contact_id)
     if err:
         return None, err
     return doc, None
