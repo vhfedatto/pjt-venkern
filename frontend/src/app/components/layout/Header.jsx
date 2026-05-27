@@ -1,0 +1,178 @@
+import { jsx, jsxs } from "react/jsx-runtime";
+import { useState, useEffect, useRef } from "react";
+import { Menu, Bell, Sun, Moon, Check, CheckCheck, MailOpen } from "../ui/Icons";
+import { useApp } from "../../context/AppContext";
+import { useAuth } from "../../context/AuthContext";
+import { Avatar } from "../ui/Avatar";
+import { useNavigate, useLocation } from "react-router";
+import { notificationsApi } from "../../services/api";
+import { AnimatePresence, motion } from "motion/react";
+const PAGE_TITLES = {
+  "/": "Dashboard",
+  "/contatos": "Contatos",
+  "/kanban": "Kanban",
+  "/grupos": "Grupos",
+  "/chat": "Chat Privado",
+  "/eventos": "Eventos",
+  "/equipes": "Equipes",
+  "/moderacao": "Modera\xE7\xE3o",
+  "/relatorios": "Relat\xF3rios",
+  "/configuracoes": "Configura\xE7\xF5es",
+  "/membros": "Membros",
+  "/convites": "Convites"
+};
+function Header() {
+  const { darkMode, setDarkMode, setSidebarOpen } = useApp();
+  const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const title = PAGE_TITLES[location.pathname] ?? "Venkern";
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+  async function loadNotifications() {
+    try {
+      const res = await notificationsApi.list();
+      setNotifications(res.data ?? []);
+      setUnreadCount(res.unread_count ?? 0);
+    } catch {
+    }
+  }
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 3e4);
+    return () => clearInterval(interval);
+  }, []);
+  useEffect(() => {
+    function handleClick(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+  async function markRead(id) {
+    await notificationsApi.markRead(id);
+    setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
+    setUnreadCount((c) => Math.max(0, c - 1));
+  }
+  async function markAllRead() {
+    await notificationsApi.markAllRead();
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    setUnreadCount(0);
+  }
+  return /* @__PURE__ */ jsxs("header", { className: "h-16 flex items-center gap-4 px-4 lg:px-6 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-30 flex-shrink-0", children: [
+    /* @__PURE__ */ jsx(
+      "button",
+      {
+        className: "lg:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 transition-colors",
+        onClick: () => setSidebarOpen(true),
+        children: /* @__PURE__ */ jsx(Menu, { className: "w-5 h-5" })
+      }
+    ),
+    /* @__PURE__ */ jsxs("div", { className: "flex-1", children: [
+      /* @__PURE__ */ jsx("h1", { className: "text-base font-bold text-gray-900 dark:text-white", children: title }),
+      /* @__PURE__ */ jsx("p", { className: "text-xs text-gray-400 hidden sm:block", children: "Venkern \xB7 Sistema de Gest\xE3o Interna" })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: () => setDarkMode(!darkMode),
+          className: "p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors",
+          title: darkMode ? "Modo claro" : "Modo escuro",
+          children: darkMode ? /* @__PURE__ */ jsx(Sun, { className: "w-4 h-4" }) : /* @__PURE__ */ jsx(Moon, { className: "w-4 h-4" })
+        }
+      ),
+      /* @__PURE__ */ jsxs("div", { className: "relative", ref: dropdownRef, children: [
+        /* @__PURE__ */ jsxs(
+          "button",
+          {
+            onClick: () => setShowDropdown((v) => !v),
+            className: "relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 transition-colors",
+            title: "Notifica\xE7\xF5es",
+            children: [
+              /* @__PURE__ */ jsx(Bell, { className: "w-4 h-4" }),
+              unreadCount > 0 && /* @__PURE__ */ jsx("span", { className: "absolute -top-0.5 -right-0.5 min-w-[16px] h-4 flex items-center justify-center bg-indigo-500 text-white text-[9px] font-bold rounded-full px-0.5", children: unreadCount > 9 ? "9+" : unreadCount })
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsx(AnimatePresence, { children: showDropdown && /* @__PURE__ */ jsxs(
+          motion.div,
+          {
+            initial: { opacity: 0, scale: 0.96, y: -4 },
+            animate: { opacity: 1, scale: 1, y: 0 },
+            exit: { opacity: 0, scale: 0.96, y: -4 },
+            transition: { duration: 0.12 },
+            className: "absolute right-0 top-11 w-80 bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 overflow-hidden z-50",
+            children: [
+              /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800", children: [
+                /* @__PURE__ */ jsxs("p", { className: "text-sm font-semibold text-gray-800 dark:text-gray-200", children: [
+                  "Notifica\xE7\xF5es ",
+                  unreadCount > 0 && /* @__PURE__ */ jsx("span", { className: "ml-1.5 px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs rounded-full", children: unreadCount })
+                ] }),
+                unreadCount > 0 && /* @__PURE__ */ jsxs(
+                  "button",
+                  {
+                    onClick: markAllRead,
+                    className: "text-xs text-indigo-600 hover:underline flex items-center gap-1",
+                    children: [
+                      /* @__PURE__ */ jsx(CheckCheck, { className: "w-3 h-3" }),
+                      "Todas lidas"
+                    ]
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ jsx("div", { className: "max-h-72 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-800", children: notifications.length === 0 ? /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center justify-center py-8 gap-2 text-gray-400", children: [
+                /* @__PURE__ */ jsx(MailOpen, { className: "w-7 h-7 opacity-30" }),
+                /* @__PURE__ */ jsx("p", { className: "text-xs", children: "Sem notifica\xE7\xF5es" })
+              ] }) : notifications.map((n) => /* @__PURE__ */ jsxs(
+                "div",
+                {
+                  className: `px-4 py-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors ${!n.is_read ? "bg-indigo-50/50 dark:bg-indigo-900/10" : ""}`,
+                  children: [
+                    /* @__PURE__ */ jsx("div", { className: `mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${!n.is_read ? "bg-indigo-500" : "bg-transparent"}` }),
+                    /* @__PURE__ */ jsxs("div", { className: "flex-1 min-w-0", children: [
+                      /* @__PURE__ */ jsx("p", { className: "text-xs font-semibold text-gray-800 dark:text-gray-200 leading-snug", children: n.title }),
+                      n.content && /* @__PURE__ */ jsx("p", { className: "text-xs text-gray-500 mt-0.5 leading-snug line-clamp-2", children: n.content }),
+                      /* @__PURE__ */ jsx("p", { className: "text-[10px] text-gray-400 mt-1", children: new Date(n.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) })
+                    ] }),
+                    !n.is_read && /* @__PURE__ */ jsx(
+                      "button",
+                      {
+                        onClick: () => markRead(n.id),
+                        className: "flex-shrink-0 p-1 text-gray-400 hover:text-indigo-500 transition-colors",
+                        title: "Marcar como lida",
+                        children: /* @__PURE__ */ jsx(Check, { className: "w-3.5 h-3.5" })
+                      }
+                    )
+                  ]
+                },
+                n.id
+              )) })
+            ]
+          }
+        ) })
+      ] }),
+      /* @__PURE__ */ jsxs(
+        "button",
+        {
+          onClick: () => navigate("/configuracoes"),
+          className: "flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors",
+          children: [
+            /* @__PURE__ */ jsx(Avatar, { name: currentUser?.name ?? "User", size: "sm" }),
+            /* @__PURE__ */ jsxs("div", { className: "hidden sm:block text-left", children: [
+              /* @__PURE__ */ jsx("p", { className: "text-sm font-semibold text-gray-900 dark:text-white leading-tight", children: (currentUser?.name ?? "User").split(" ")[0] }),
+              /* @__PURE__ */ jsx("p", { className: "text-xs text-gray-400 leading-tight", children: currentUser?.is_super_admin ? "Super Admin" : "Usu\xE1rio" })
+            ] })
+          ]
+        }
+      )
+    ] })
+  ] });
+}
+export {
+  Header
+};

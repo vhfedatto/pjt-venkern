@@ -1,0 +1,421 @@
+import { jsx, jsxs } from "react/jsx-runtime";
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+import {
+  Users,
+  UserPlus,
+  Link2,
+  Copy,
+  Trash2,
+  ShieldCheck,
+  Search,
+  X,
+  ChevronDown,
+  RefreshCw
+} from "../components/ui/Icons";
+import { useProject } from "../context/ProjectContext";
+import { useAuth } from "../context/AuthContext";
+import { projectsApi, usersApi } from "../services/api";
+import { Avatar } from "../components/ui/Avatar";
+function RoleBadge({ role }) {
+  const isAdmin = role === "ADMIN";
+  return /* @__PURE__ */ jsxs(
+    "span",
+    {
+      className: `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${isAdmin ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"}`,
+      children: [
+        isAdmin && /* @__PURE__ */ jsx(ShieldCheck, { className: "w-3 h-3" }),
+        role
+      ]
+    }
+  );
+}
+function ProjectMembers() {
+  const { currentProject } = useProject();
+  const { user: currentUser } = useAuth();
+  const projectId = currentProject?.id;
+  const isAdmin = currentProject?.role === "ADMIN" || currentUser?.is_super_admin;
+  const [members, setMembers] = useState([]);
+  const [invites, setInvites] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [loadingInvites, setLoadingInvites] = useState(false);
+  const [usernameQuery, setUsernameQuery] = useState("");
+  const [userResults, setUserResults] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [inviteRole, setInviteRole] = useState("PROFESSIONAL");
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState(false);
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [linkRole, setLinkRole] = useState("PROFESSIONAL");
+  const [linkExpires, setLinkExpires] = useState("7");
+  const [linkMaxUses, setLinkMaxUses] = useState("1");
+  const [creatingLink, setCreatingLink] = useState(false);
+  const loadMembers = useCallback(async () => {
+    if (!projectId) return;
+    setLoadingMembers(true);
+    try {
+      const res = await projectsApi.members(projectId);
+      setMembers(res.data ?? []);
+    } catch {
+      toast.error("Erro ao carregar membros");
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, [projectId]);
+  const loadInvites = useCallback(async () => {
+    if (!projectId || !isAdmin) return;
+    setLoadingInvites(true);
+    try {
+      const res = await projectsApi.listInvites(projectId);
+      setInvites(res.data ?? []);
+    } catch {
+    } finally {
+      setLoadingInvites(false);
+    }
+  }, [projectId, isAdmin]);
+  useEffect(() => {
+    loadMembers();
+    loadInvites();
+  }, [loadMembers, loadInvites]);
+  useEffect(() => {
+    if (!usernameQuery || usernameQuery.length < 2) {
+      setUserResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchingUsers(true);
+      try {
+        const res = await usersApi.search(usernameQuery);
+        setUserResults(res ?? []);
+      } catch {
+        setUserResults([]);
+      } finally {
+        setSearchingUsers(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [usernameQuery]);
+  async function handleInviteByUsername() {
+    if (!projectId || !selectedUser) return;
+    setSendingInvite(true);
+    try {
+      await projectsApi.inviteMemberByUsername(projectId, {
+        username: selectedUser.username ?? selectedUser.name,
+        role: inviteRole
+      });
+      toast.success(`Convite enviado para ${selectedUser.name}`);
+      setSelectedUser(null);
+      setUsernameQuery("");
+      setUserResults([]);
+    } catch (e) {
+      toast.error(e.message ?? "Erro ao enviar convite");
+    } finally {
+      setSendingInvite(false);
+    }
+  }
+  async function handleCreateLink() {
+    if (!projectId) return;
+    setCreatingLink(true);
+    try {
+      const invite = await projectsApi.createInvite(projectId, {
+        role: linkRole,
+        expiresInDays: linkExpires ? parseInt(linkExpires) : void 0,
+        maxUses: linkMaxUses ? parseInt(linkMaxUses) : void 0
+      });
+      setInvites((prev) => [invite, ...prev]);
+      setShowLinkForm(false);
+      toast.success("Link de convite criado!");
+    } catch (e) {
+      toast.error(e.message ?? "Erro ao criar link");
+    } finally {
+      setCreatingLink(false);
+    }
+  }
+  async function handleRevokeInvite(inviteId) {
+    if (!projectId) return;
+    try {
+      await projectsApi.revokeInvite(projectId, inviteId);
+      setInvites((prev) => prev.filter((i) => i.id !== inviteId));
+      toast.success("Convite revogado");
+    } catch (e) {
+      toast.error(e.message ?? "Erro ao revogar convite");
+    }
+  }
+  async function handleChangeRole(memberId, newRole) {
+    if (!projectId) return;
+    try {
+      await projectsApi.changeMemberRole(projectId, memberId, newRole);
+      setMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, role: newRole } : m));
+      toast.success("Papel atualizado");
+    } catch (e) {
+      toast.error(e.message ?? "Erro ao atualizar papel");
+    }
+  }
+  async function handleRemoveMember(memberId) {
+    if (!projectId) return;
+    if (!confirm("Remover este membro do projeto?")) return;
+    try {
+      await projectsApi.removeMember(projectId, memberId);
+      setMembers((prev) => prev.filter((m) => m.id !== memberId));
+      toast.success("Membro removido");
+    } catch (e) {
+      toast.error(e.message ?? "Erro ao remover membro");
+    }
+  }
+  function copyLink(url) {
+    navigator.clipboard.writeText(url).then(() => toast.success("Link copiado!"));
+  }
+  if (!currentProject) {
+    return /* @__PURE__ */ jsx("div", { className: "flex items-center justify-center h-64 text-gray-400", children: "Selecione um projeto para gerenciar membros." });
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-6 p-1", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsxs("h1", { className: "text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx(Users, { className: "w-5 h-5 text-indigo-500" }),
+          "Membros \u2014 ",
+          currentProject.name
+        ] }),
+        /* @__PURE__ */ jsxs("p", { className: "text-sm text-gray-500 mt-0.5", children: [
+          members.length,
+          " membro(s) ativo(s)"
+        ] })
+      ] }),
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: () => {
+            loadMembers();
+            loadInvites();
+          },
+          className: "p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 transition-colors",
+          title: "Atualizar",
+          children: /* @__PURE__ */ jsx(RefreshCw, { className: "w-4 h-4" })
+        }
+      )
+    ] }),
+    isAdmin && /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-4", children: [
+      /* @__PURE__ */ jsxs("div", { className: "bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3", children: [
+        /* @__PURE__ */ jsxs("h2", { className: "text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx(UserPlus, { className: "w-4 h-4 text-indigo-500" }),
+          "Convidar por @username"
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "relative", children: [
+          /* @__PURE__ */ jsx(Search, { className: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" }),
+          /* @__PURE__ */ jsx(
+            "input",
+            {
+              type: "text",
+              value: usernameQuery,
+              onChange: (e) => {
+                setUsernameQuery(e.target.value);
+                setSelectedUser(null);
+              },
+              placeholder: "Buscar por @username ou nome...",
+              className: "w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            }
+          ),
+          searchingUsers && /* @__PURE__ */ jsx("div", { className: "absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" })
+        ] }),
+        userResults.length > 0 && !selectedUser && /* @__PURE__ */ jsx("div", { className: "border border-gray-100 dark:border-gray-700 rounded-xl overflow-hidden divide-y divide-gray-100 dark:divide-gray-800", children: userResults.map((u) => /* @__PURE__ */ jsxs(
+          "button",
+          {
+            onClick: () => {
+              setSelectedUser(u);
+              setUsernameQuery(u.username ?? u.name);
+              setUserResults([]);
+            },
+            className: "w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 text-left transition-colors",
+            children: [
+              /* @__PURE__ */ jsx(Avatar, { name: u.name, size: "sm" }),
+              /* @__PURE__ */ jsxs("div", { children: [
+                /* @__PURE__ */ jsx("p", { className: "text-sm font-medium text-gray-800 dark:text-gray-200", children: u.name }),
+                /* @__PURE__ */ jsx("p", { className: "text-xs text-gray-400", children: u.username ? `@${u.username}` : u.email })
+              ] })
+            ]
+          },
+          u.id
+        )) }),
+        selectedUser && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl", children: [
+          /* @__PURE__ */ jsx(Avatar, { name: selectedUser.name, size: "sm" }),
+          /* @__PURE__ */ jsxs("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsx("p", { className: "text-sm font-medium text-indigo-700 dark:text-indigo-300", children: selectedUser.name }),
+            /* @__PURE__ */ jsx("p", { className: "text-xs text-indigo-400", children: selectedUser.username ? `@${selectedUser.username}` : "" })
+          ] }),
+          /* @__PURE__ */ jsx("button", { onClick: () => {
+            setSelectedUser(null);
+            setUsernameQuery("");
+          }, className: "text-gray-400 hover:text-gray-600", children: /* @__PURE__ */ jsx(X, { className: "w-4 h-4" }) })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
+          /* @__PURE__ */ jsxs(
+            "select",
+            {
+              value: inviteRole,
+              onChange: (e) => setInviteRole(e.target.value),
+              className: "flex-1 text-sm px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500",
+              children: [
+                /* @__PURE__ */ jsx("option", { value: "PROFESSIONAL", children: "Professional" }),
+                /* @__PURE__ */ jsx("option", { value: "ADMIN", children: "Admin" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxs(
+            "button",
+            {
+              onClick: handleInviteByUsername,
+              disabled: !selectedUser || sendingInvite,
+              className: "px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-1.5",
+              children: [
+                sendingInvite ? /* @__PURE__ */ jsx("div", { className: "w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" }) : /* @__PURE__ */ jsx(UserPlus, { className: "w-3.5 h-3.5" }),
+                "Convidar"
+              ]
+            }
+          )
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+          /* @__PURE__ */ jsxs("h2", { className: "text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2", children: [
+            /* @__PURE__ */ jsx(Link2, { className: "w-4 h-4 text-indigo-500" }),
+            "Links de convite"
+          ] }),
+          /* @__PURE__ */ jsxs(
+            "button",
+            {
+              onClick: () => setShowLinkForm((v) => !v),
+              className: "text-xs text-indigo-600 hover:underline flex items-center gap-1",
+              children: [
+                "Novo link ",
+                /* @__PURE__ */ jsx(ChevronDown, { className: `w-3 h-3 transition-transform ${showLinkForm ? "rotate-180" : ""}` })
+              ]
+            }
+          )
+        ] }),
+        showLinkForm && /* @__PURE__ */ jsxs("div", { className: "space-y-2 pt-1", children: [
+          /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-3 gap-2", children: [
+            /* @__PURE__ */ jsxs("div", { children: [
+              /* @__PURE__ */ jsx("label", { className: "text-xs text-gray-500 block mb-1", children: "Papel" }),
+              /* @__PURE__ */ jsxs(
+                "select",
+                {
+                  value: linkRole,
+                  onChange: (e) => setLinkRole(e.target.value),
+                  className: "w-full text-sm px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300",
+                  children: [
+                    /* @__PURE__ */ jsx("option", { value: "PROFESSIONAL", children: "Professional" }),
+                    /* @__PURE__ */ jsx("option", { value: "ADMIN", children: "Admin" })
+                  ]
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxs("div", { children: [
+              /* @__PURE__ */ jsx("label", { className: "text-xs text-gray-500 block mb-1", children: "Expira (dias)" }),
+              /* @__PURE__ */ jsx(
+                "input",
+                {
+                  type: "number",
+                  min: "1",
+                  value: linkExpires,
+                  onChange: (e) => setLinkExpires(e.target.value),
+                  className: "w-full text-sm px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxs("div", { children: [
+              /* @__PURE__ */ jsx("label", { className: "text-xs text-gray-500 block mb-1", children: "Usos m\xE1x." }),
+              /* @__PURE__ */ jsx(
+                "input",
+                {
+                  type: "number",
+                  min: "1",
+                  value: linkMaxUses,
+                  onChange: (e) => setLinkMaxUses(e.target.value),
+                  className: "w-full text-sm px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+                }
+              )
+            ] })
+          ] }),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              onClick: handleCreateLink,
+              disabled: creatingLink,
+              className: "w-full py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors",
+              children: creatingLink ? "Gerando..." : "Gerar link"
+            }
+          )
+        ] }),
+        loadingInvites ? /* @__PURE__ */ jsx("p", { className: "text-xs text-gray-400", children: "Carregando convites..." }) : invites.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-xs text-gray-400", children: "Nenhum link ativo." }) : /* @__PURE__ */ jsx("div", { className: "space-y-2 max-h-48 overflow-y-auto", children: invites.map((inv) => /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-xl", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsx("p", { className: "text-xs font-medium text-gray-700 dark:text-gray-300 truncate", children: inv.invite_url }),
+            /* @__PURE__ */ jsxs("p", { className: "text-[10px] text-gray-400", children: [
+              inv.role,
+              " \xB7 ",
+              inv.used_count,
+              "/",
+              inv.max_uses ?? "\u221E",
+              " usos",
+              inv.expires_at && ` \xB7 expira ${new Date(inv.expires_at).toLocaleDateString("pt-BR")}`
+            ] })
+          ] }),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              onClick: () => copyLink(inv.invite_url),
+              className: "p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-indigo-600 transition-colors",
+              title: "Copiar link",
+              children: /* @__PURE__ */ jsx(Copy, { className: "w-3.5 h-3.5" })
+            }
+          ),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              onClick: () => handleRevokeInvite(inv.id),
+              className: "p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors",
+              title: "Revogar",
+              children: /* @__PURE__ */ jsx(Trash2, { className: "w-3.5 h-3.5" })
+            }
+          )
+        ] }, inv.id)) })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden", children: [
+      /* @__PURE__ */ jsx("div", { className: "px-4 py-3 border-b border-gray-100 dark:border-gray-800", children: /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold text-gray-700 dark:text-gray-300", children: "Membros ativos" }) }),
+      loadingMembers ? /* @__PURE__ */ jsx("div", { className: "flex items-center justify-center py-12", children: /* @__PURE__ */ jsx("div", { className: "w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" }) }) : members.length === 0 ? /* @__PURE__ */ jsx("div", { className: "text-center py-12 text-gray-400 text-sm", children: "Nenhum membro encontrado." }) : /* @__PURE__ */ jsx("div", { className: "divide-y divide-gray-100 dark:divide-gray-800", children: members.map((member) => /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 px-4 py-3", children: [
+        /* @__PURE__ */ jsx(Avatar, { name: member.user?.name ?? `User ${member.user_id}`, size: "sm" }),
+        /* @__PURE__ */ jsxs("div", { className: "flex-1 min-w-0", children: [
+          /* @__PURE__ */ jsx("p", { className: "text-sm font-medium text-gray-800 dark:text-gray-200 truncate", children: member.user?.name ?? `Usu\xE1rio #${member.user_id}` }),
+          /* @__PURE__ */ jsx("p", { className: "text-xs text-gray-400 truncate", children: member.user?.username ? `@${member.user.username}` : member.user?.email ?? "" })
+        ] }),
+        /* @__PURE__ */ jsx(RoleBadge, { role: member.role }),
+        isAdmin && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1", children: [
+          /* @__PURE__ */ jsxs(
+            "select",
+            {
+              value: member.role,
+              onChange: (e) => handleChangeRole(member.id, e.target.value),
+              className: "text-xs px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
+              children: [
+                /* @__PURE__ */ jsx("option", { value: "PROFESSIONAL", children: "Professional" }),
+                /* @__PURE__ */ jsx("option", { value: "ADMIN", children: "Admin" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              onClick: () => handleRemoveMember(member.id),
+              className: "p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors",
+              title: "Remover membro",
+              children: /* @__PURE__ */ jsx(Trash2, { className: "w-3.5 h-3.5" })
+            }
+          )
+        ] })
+      ] }, member.id)) })
+    ] })
+  ] });
+}
+export {
+  ProjectMembers as default
+};
