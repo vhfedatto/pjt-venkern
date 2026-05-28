@@ -1,13 +1,14 @@
-import { jsx } from "react/jsx-runtime";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000/api";
-const TOKEN_KEY = "venkern_token";
-const PROJECT_KEY = "venkern_project_id";
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api';
+const TOKEN_KEY = 'venkern_token';
+const PROJECT_KEY = 'venkern_project_id';
 const AuthContext = createContext(null);
 async function authFetch(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify(body)
   });
   const data = await res.json().catch(() => ({}));
@@ -16,11 +17,15 @@ async function authFetch(path, body) {
   }
   return data;
 }
-function AuthProvider({ children }) {
+export function AuthProvider({
+  children
+}) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [projects, setProjects] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // On mount: verify stored token
   useEffect(() => {
     const stored = localStorage.getItem(TOKEN_KEY);
     if (!stored) {
@@ -28,8 +33,10 @@ function AuthProvider({ children }) {
       return;
     }
     fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${stored}` }
-    }).then((res) => res.ok ? res.json() : Promise.reject()).then((data) => {
+      headers: {
+        Authorization: `Bearer ${stored}`
+      }
+    }).then(res => res.ok ? res.json() : Promise.reject()).then(data => {
       setUser(data);
       setToken(stored);
       setProjects(data.projects ?? []);
@@ -53,7 +60,9 @@ function AuthProvider({ children }) {
       return;
     }
     const res = await fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${activeToken}` }
+      headers: {
+        Authorization: `Bearer ${activeToken}`
+      }
     });
     if (!res.ok) {
       localStorage.removeItem(TOKEN_KEY);
@@ -61,7 +70,7 @@ function AuthProvider({ children }) {
       setUser(null);
       setToken(null);
       setProjects([]);
-      throw new Error("Sess\xE3o expirada. Fa\xE7a login novamente.");
+      throw new Error('Sessão expirada. Faça login novamente.');
     }
     const data = await res.json();
     setUser(data);
@@ -69,22 +78,38 @@ function AuthProvider({ children }) {
     setProjects(data.projects ?? []);
   }, []);
   const login = useCallback(async (email, password) => {
-    const { access_token, user: u, projects: p } = await authFetch("/auth/login", { email, password });
+    const {
+      access_token,
+      user: u,
+      projects: p
+    } = await authFetch('/auth/login', {
+      email,
+      password
+    });
     localStorage.removeItem(PROJECT_KEY);
     _persist(access_token, u, p ?? []);
   }, []);
   const register = useCallback(async (name, email, password, username) => {
-    const { access_token, user: u, projects: p } = await authFetch("/auth/register", { name, email, password, username: username || void 0 });
+    const {
+      access_token,
+      user: u,
+      projects: p
+    } = await authFetch('/auth/register', {
+      name,
+      email,
+      password,
+      username: username || undefined
+    });
     localStorage.removeItem(PROJECT_KEY);
     _persist(access_token, u, p ?? []);
   }, []);
-  const updateUser = useCallback((nextUser) => {
+  const updateUser = useCallback(nextUser => {
     setUser(nextUser);
   }, []);
-  const upsertProject = useCallback((project) => {
-    setProjects((prev) => {
-      const exists = prev.some((item) => item.id === project.id);
-      return exists ? prev.map((item) => item.id === project.id ? project : item) : [...prev, project];
+  const upsertProject = useCallback(project => {
+    setProjects(prev => {
+      const exists = prev.some(item => item.id === project.id);
+      return exists ? prev.map(item => item.id === project.id ? project : item) : [...prev, project];
     });
   }, []);
   const logout = useCallback(() => {
@@ -94,32 +119,24 @@ function AuthProvider({ children }) {
     setUser(null);
     setProjects([]);
   }, []);
-  return /* @__PURE__ */ jsx(
-    AuthContext.Provider,
-    {
-      value: {
-        user,
-        token,
-        projects,
-        isAuthenticated: !!token && !!user,
-        isLoading,
-        login,
-        register,
-        refreshSession,
-        updateUser,
-        upsertProject,
-        logout
-      },
-      children
-    }
-  );
+  return <AuthContext.Provider value={{
+    user,
+    token,
+    projects,
+    isAuthenticated: !!token && !!user,
+    isLoading,
+    login,
+    register,
+    refreshSession,
+    updateUser,
+    upsertProject,
+    logout
+  }}>
+      {children}
+    </AuthContext.Provider>;
 }
-function useAuth() {
+export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
   return ctx;
 }
-export {
-  AuthProvider,
-  useAuth
-};

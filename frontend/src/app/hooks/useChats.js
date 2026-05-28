@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { chatsApi, contactsApi } from "../services/api";
-import { useProject } from "../context/ProjectContext";
-import { mapApiChatToUi, mapApiContactToUi, mapApiMessageToUi } from "../services/mappers";
-function useChats(socket) {
-  const { currentProject } = useProject();
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { chatsApi, contactsApi } from '../services/api';
+import { useProject } from '../context/ProjectContext';
+import { mapApiChatToUi, mapApiContactToUi, mapApiMessageToUi } from '../services/mappers';
+export function useChats(socket) {
+  const {
+    currentProject
+  } = useProject();
   const [conversations, setConversations] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -21,15 +23,15 @@ function useChats(socket) {
     }
     setLoading(true);
     try {
-      const [chatsRes, contactsRes] = await Promise.all([
-        chatsApi.list(String(currentProject.id)),
-        contactsApi.list({ per_page: 200, project_id: currentProject.id })
-      ]);
+      const [chatsRes, contactsRes] = await Promise.all([chatsApi.list(String(currentProject.id)), contactsApi.list({
+        per_page: 200,
+        project_id: currentProject.id
+      })]);
       setConversations(Array.isArray(chatsRes) ? chatsRes.map(mapApiChatToUi) : []);
       setContacts((contactsRes.data ?? []).map(mapApiContactToUi));
       setError(null);
     } catch (e) {
-      setError(e?.message ?? "Erro ao carregar conversas");
+      setError(e?.message ?? 'Erro ao carregar conversas');
     } finally {
       setLoading(false);
     }
@@ -37,38 +39,44 @@ function useChats(socket) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Real-time: listen for incoming private messages
   useEffect(() => {
     if (!socket) return;
-    const onNewMessage = (payload) => {
+    const onNewMessage = payload => {
       const msg = {
         id: String(payload.id),
         senderId: String(payload.senderId),
         content: payload.content,
-        type: payload.messageType ?? "text",
+        type: payload.messageType ?? 'text',
         timestamp: payload.createdAt,
         blocked: payload.blocked ?? false
       };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
+      setMessages(prev => {
+        if (prev.some(m => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
-      setConversations(
-        (prev) => prev.map(
-          (c) => c.id === String(payload.conversationId) ? { ...c, lastActivity: payload.createdAt } : c
-        )
-      );
+      setConversations(prev => prev.map(c => c.id === String(payload.conversationId) ? {
+        ...c,
+        lastActivity: payload.createdAt
+      } : c));
     };
-    socket.on("private_message:new", onNewMessage);
+    socket.on('private_message:new', onNewMessage);
     return () => {
-      socket.off("private_message:new", onNewMessage);
+      socket.off('private_message:new', onNewMessage);
     };
   }, [socket]);
-  const loadMessages = useCallback(async (chatId) => {
+  const loadMessages = useCallback(async chatId => {
+    // Leave previous room, join new one
     if (socket) {
       if (activeConvIdRef.current && activeConvIdRef.current !== chatId) {
-        socket.emit("leave_conversation", { conversationId: Number(activeConvIdRef.current) });
+        socket.emit('leave_conversation', {
+          conversationId: Number(activeConvIdRef.current)
+        });
       }
-      socket.emit("join_conversation", { conversationId: Number(chatId) });
+      socket.emit('join_conversation', {
+        conversationId: Number(chatId)
+      });
     }
     activeConvIdRef.current = chatId;
     setMessagesLoading(true);
@@ -82,25 +90,28 @@ function useChats(socket) {
       setMessagesLoading(false);
     }
   }, [socket]);
-  const sendMessage = async (chatId, senderId, content, type = "text") => {
+  const sendMessage = async (chatId, senderId, content, type = 'text') => {
     if (socket?.connected) {
-      socket.emit("send_private_message", {
+      socket.emit('send_private_message', {
         conversationId: Number(chatId),
         content,
         messageType: type
       });
-      return void 0;
+      // Optimistic return — real message arrives via socket event
+      return undefined;
     }
+    // Fallback to REST
     const res = await chatsApi.sendMessage(chatId, {
       sender_id: Number(senderId),
       content,
       type
     });
     const newMsg = mapApiMessageToUi(res);
-    setMessages((p) => [...p, newMsg]);
-    setConversations((p) => p.map(
-      (c) => c.id === chatId ? { ...c, lastActivity: (/* @__PURE__ */ new Date()).toISOString() } : c
-    ));
+    setMessages(p => [...p, newMsg]);
+    setConversations(p => p.map(c => c.id === chatId ? {
+      ...c,
+      lastActivity: new Date().toISOString()
+    } : c));
     return newMsg;
   };
   const createConversation = async (participantA, participantB) => {
@@ -110,8 +121,8 @@ function useChats(socket) {
       project_id: currentProject?.id
     });
     const conv = mapApiChatToUi(res);
-    setConversations((p) => {
-      if (p.some((c) => c.id === conv.id)) return p.map((c) => c.id === conv.id ? conv : c);
+    setConversations(p => {
+      if (p.some(c => c.id === conv.id)) return p.map(c => c.id === conv.id ? conv : c);
       return [conv, ...p];
     });
     return conv;
@@ -129,6 +140,3 @@ function useChats(socket) {
     createConversation
   };
 }
-export {
-  useChats
-};

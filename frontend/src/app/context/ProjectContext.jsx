@@ -1,15 +1,23 @@
-import { jsx } from "react/jsx-runtime";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { useAuth } from "./AuthContext";
-const STORAGE_KEY = "venkern_project_id";
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useAuth } from './AuthContext';
+const STORAGE_KEY = 'venkern_project_id';
 const ProjectContext = createContext(null);
-function ProjectProvider({ children }) {
-  const { projects, isLoading } = useAuth();
+export function ProjectProvider({
+  children
+}) {
+  const {
+    projects,
+    isLoading
+  } = useAuth();
   const [currentProject, setCurrentProjectState] = useState(() => {
     const storedId = localStorage.getItem(STORAGE_KEY);
     if (!storedId) return null;
-    return { id: Number(storedId) };
+    return {
+      id: Number(storedId)
+    };
   });
+
+  // Wait until auth finishes loading before reconciling the selected project.
   useEffect(() => {
     if (isLoading) {
       return;
@@ -21,14 +29,14 @@ function ProjectProvider({ children }) {
     }
     const storedId = localStorage.getItem(STORAGE_KEY);
     if (storedId) {
-      const found = projects.find((p) => p.id === Number(storedId));
+      const found = projects.find(p => p.id === Number(storedId));
       if (found) {
         setCurrentProjectState(found);
         return;
       }
     }
     if (currentProject) {
-      const hydrated = projects.find((project) => project.id === currentProject.id);
+      const hydrated = projects.find(project => project.id === currentProject.id);
       if (hydrated) {
         setCurrentProjectState(hydrated);
         localStorage.setItem(STORAGE_KEY, String(hydrated.id));
@@ -39,18 +47,19 @@ function ProjectProvider({ children }) {
     setCurrentProjectState(fallback);
     localStorage.setItem(STORAGE_KEY, String(fallback.id));
   }, [currentProject, isLoading, projects]);
-  const setCurrentProject = useCallback((project) => {
+  const setCurrentProject = useCallback(project => {
     localStorage.setItem(STORAGE_KEY, String(project.id));
     setCurrentProjectState(project);
   }, []);
-  return /* @__PURE__ */ jsx(ProjectContext.Provider, { value: { currentProject, setCurrentProject }, children });
+  return <ProjectContext.Provider value={{
+    currentProject,
+    setCurrentProject
+  }}>
+      {children}
+    </ProjectContext.Provider>;
 }
-function useProject() {
+export function useProject() {
   const ctx = useContext(ProjectContext);
-  if (!ctx) throw new Error("useProject must be used within ProjectProvider");
+  if (!ctx) throw new Error('useProject must be used within ProjectProvider');
   return ctx;
 }
-export {
-  ProjectProvider,
-  useProject
-};

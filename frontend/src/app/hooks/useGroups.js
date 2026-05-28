@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { groupsApi, contactsApi } from "../services/api";
-import { useProject } from "../context/ProjectContext";
-import { mapApiGroupToUi, mapApiContactToUi, mapApiMessageToUi } from "../services/mappers";
-function useGroups(socket) {
-  const { currentProject } = useProject();
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { groupsApi, contactsApi } from '../services/api';
+import { useProject } from '../context/ProjectContext';
+import { mapApiGroupToUi, mapApiContactToUi, mapApiMessageToUi } from '../services/mappers';
+export function useGroups(socket) {
+  const {
+    currentProject
+  } = useProject();
   const [groups, setGroups] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -21,16 +23,18 @@ function useGroups(socket) {
     }
     setLoading(true);
     try {
-      const [groupsRes, contactsRes] = await Promise.all([
-        groupsApi.list({ project_id: currentProject.id }),
-        contactsApi.list({ per_page: 200, project_id: currentProject.id })
-      ]);
+      const [groupsRes, contactsRes] = await Promise.all([groupsApi.list({
+        project_id: currentProject.id
+      }), contactsApi.list({
+        per_page: 200,
+        project_id: currentProject.id
+      })]);
       const groupsData = groupsRes.data ?? (Array.isArray(groupsRes) ? groupsRes : []);
       setGroups(groupsData.map(mapApiGroupToUi));
       setContacts((contactsRes.data ?? []).map(mapApiContactToUi));
       setError(null);
     } catch (e) {
-      setError(e?.message ?? "Erro ao carregar grupos");
+      setError(e?.message ?? 'Erro ao carregar grupos');
     } finally {
       setLoading(false);
     }
@@ -38,38 +42,43 @@ function useGroups(socket) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Real-time: listen for incoming group messages
   useEffect(() => {
     if (!socket) return;
-    const onNewMessage = (payload) => {
+    const onNewMessage = payload => {
       const msg = {
         id: String(payload.id),
         senderId: String(payload.senderId),
         content: payload.content,
-        type: payload.messageType ?? "text",
+        type: payload.messageType ?? 'text',
         timestamp: payload.createdAt,
         blocked: payload.blocked ?? false
       };
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev;
+      setMessages(prev => {
+        if (prev.some(m => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
-      setGroups(
-        (prev) => prev.map(
-          (g) => g.id === String(payload.groupId) ? { ...g, lastActivity: payload.createdAt } : g
-        )
-      );
+      setGroups(prev => prev.map(g => g.id === String(payload.groupId) ? {
+        ...g,
+        lastActivity: payload.createdAt
+      } : g));
     };
-    socket.on("group_message:new", onNewMessage);
+    socket.on('group_message:new', onNewMessage);
     return () => {
-      socket.off("group_message:new", onNewMessage);
+      socket.off('group_message:new', onNewMessage);
     };
   }, [socket]);
-  const loadMessages = useCallback(async (groupId) => {
+  const loadMessages = useCallback(async groupId => {
     if (socket) {
       if (activeGroupIdRef.current && activeGroupIdRef.current !== groupId) {
-        socket.emit("leave_group", { groupId: Number(activeGroupIdRef.current) });
+        socket.emit('leave_group', {
+          groupId: Number(activeGroupIdRef.current)
+        });
       }
-      socket.emit("join_group", { groupId: Number(groupId) });
+      socket.emit('join_group', {
+        groupId: Number(groupId)
+      });
     }
     activeGroupIdRef.current = groupId;
     setMessagesLoading(true);
@@ -83,25 +92,27 @@ function useGroups(socket) {
       setMessagesLoading(false);
     }
   }, [socket]);
-  const sendMessage = async (groupId, senderId, content, type = "text") => {
+  const sendMessage = async (groupId, senderId, content, type = 'text') => {
     if (socket?.connected) {
-      socket.emit("send_group_message", {
+      socket.emit('send_group_message', {
         groupId: Number(groupId),
         content,
         messageType: type
       });
-      return void 0;
+      return undefined;
     }
+    // Fallback to REST
     const res = await groupsApi.sendMessage(groupId, {
       sender_id: Number(senderId),
       content,
       type
     });
     const newMsg = mapApiMessageToUi(res);
-    setMessages((p) => [...p, newMsg]);
-    setGroups((p) => p.map(
-      (g) => g.id === groupId ? { ...g, lastActivity: (/* @__PURE__ */ new Date()).toISOString() } : g
-    ));
+    setMessages(p => [...p, newMsg]);
+    setGroups(p => p.map(g => g.id === groupId ? {
+      ...g,
+      lastActivity: new Date().toISOString()
+    } : g));
     return newMsg;
   };
   return {
@@ -116,6 +127,3 @@ function useGroups(socket) {
     sendMessage
   };
 }
-export {
-  useGroups
-};

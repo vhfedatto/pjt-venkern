@@ -1,30 +1,23 @@
-import "@testing-library/jest-dom";
-Object.defineProperty(window, "matchMedia", {
+import '@testing-library/jest-dom';
+Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: (query) => ({
+  value: query => ({
     matches: false,
     media: query,
     onchange: null,
-    addListener: () => {
-    },
-    removeListener: () => {
-    },
-    addEventListener: () => {
-    },
-    removeEventListener: () => {
-    },
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
     dispatchEvent: () => false
   })
 });
 class ResizeObserverMock {
-  observe() {
-  }
-  unobserve() {
-  }
-  disconnect() {
-  }
+  observe() {}
+  unobserve() {}
+  disconnect() {}
 }
-Object.defineProperty(globalThis, "ResizeObserver", {
+Object.defineProperty(globalThis, 'ResizeObserver', {
   writable: true,
   value: ResizeObserverMock
 });

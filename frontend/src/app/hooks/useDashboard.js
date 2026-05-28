@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import { dashboardApi } from "../services/api";
-function useDashboard(projectId) {
+import { useState, useEffect, useCallback } from 'react';
+import { dashboardApi } from '../services/api';
+export function useDashboard(projectId) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,7 +16,7 @@ function useDashboard(projectId) {
       const data = await dashboardApi.summary(projectId);
       setSummary(data);
     } catch (e) {
-      setError(e?.message ?? "Erro ao carregar resumo do dashboard");
+      setError(e?.message ?? 'Erro ao carregar resumo do dashboard');
     } finally {
       setLoading(false);
     }
@@ -24,8 +24,10 @@ function useDashboard(projectId) {
   useEffect(() => {
     fetchSummary();
   }, [fetchSummary]);
-  return { summary, loading, error, refetch: fetchSummary };
+  return {
+    summary,
+    loading,
+    error,
+    refetch: fetchSummary
+  };
 }
-export {
-  useDashboard
-};
